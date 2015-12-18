@@ -1,0 +1,10 @@
+{
+    "debug": true,
+    "threshold": 10,
+    "duration_in_days": 1,
+    "payer_account_id": "...",
+    "linked_account_id": "...",
+    "slack_webhook_url": "https://hooks.slack.com/services/...",
+    "channel": "@username",
+    "bucket": "billing-bucket"
+}
