@@ -1,0 +1,7 @@
+{
+    "name": "Billing",
+    "description": "A collection of Amazon Lambda functions that use detailed billing reports to trigger notifications.",
+    "role": "arn:aws:iam::715496170458:role/lambda_basic_execution",
+    "runtime": "python",
+    "nameTemplate": "func{{.Project.Name}}{{.Function.Name}}"
+}

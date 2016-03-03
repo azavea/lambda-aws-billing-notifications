@@ -1,0 +1,9 @@
+{
+    "name": "Slack",
+    "description": "Triggers billing report Slack notifications.",
+    "memory": 256,
+    "timeout": 60,
+    "hooks": {
+        "deploy": "make"
+    }
+}

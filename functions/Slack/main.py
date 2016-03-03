@@ -6,7 +6,6 @@ from zipfile import ZipFile
 from datetime import datetime, timedelta
 
 import os
-import json
 import logging
 import boto3
 import requests
@@ -22,44 +21,38 @@ LOG.setLevel(logging.DEBUG)
 TEMP_DIR = tempfile.gettempdir()
 
 
-def lambda_handler(event, context):
+def handle(event, context):
     """Amazon Lambda event handler.
 
     Arguments:
     event   -- Source event
     context -- Amazon Lambda context object
     """
-    with open('config.json') as config_json:
-        config = json.load(config_json)
-
-    if config['debug']:
+    if os.environ.get('AWS_BILLING_DEBUG', False):
         LOG.setLevel(logging.DEBUG)
-        LOG.debug(json.dumps(event))
 
-    estimated_charges = get_estimated_charges(**config)
+    estimated_charges = get_estimated_charges()
 
     LOG.debug('Estimated charges are [%s]', estimated_charges)
 
-    if estimated_charges > config['threshold']:
-        requests.post(config['slack_webhook_url'],
-                      json={'text': 'Blended costs for account ID {} have exceeded the threshold '
-                                    'of ${} with ${:.2f}.'.format(config['linked_account_id'],
-                                                                  config['threshold'],
-                                                                  estimated_charges),
-                            'channel': config['channel']})
+    if estimated_charges > float(os.environ['AWS_BILLING_THRESHOLD']):
+        requests.post(os.environ['AWS_BILLING_SLACK_WEBHOOK_URL'],
+                      json={'text': 'Blended costs for {} have exceeded the threshold '
+                                    'of ${} with ${:.2f}.'.format(
+                                        os.environ.get('AWS_BILLING_LINKED_ACCOUNT_ALIAS',
+                                                       os.environ['AWS_BILLING_LINKED_ACCOUNT_ID']),
+                                        os.environ['AWS_BILLING_THRESHOLD'],
+                                        estimated_charges),
+                            'channel': os.environ['AWS_BILLING_SLACK_CHANNEL']})
 
 
-def get_estimated_charges(bucket=None, duration_in_days=1,
-                          payer_account_id=None, linked_account_id=None,
-                          **kwargs):
-    """Gather estimated AWS charges from raw Amazon billing data.
+def get_estimated_charges():
+    """Gather estimated AWS charges from raw Amazon billing data."""
+    bucket = os.environ['AWS_BILLING_BUCKET']
+    duration_in_days = os.environ.get('AWS_BILLING_DURATION_IN_DAYS', 1)
+    payer_account_id = os.environ['AWS_BILLING_PAYER_ACCOUNT_ID']
+    linked_account_id = os.environ['AWS_BILLING_LINKED_ACCOUNT_ID']
 
-    Keyword arguments:
-    bucket -- Bucket housing raw Amazon billing data
-    duration_in_days -- Number of days collect billing data points
-    payer_account_id -- Parent account ID for consolidated billing
-    linked_account_id -- Linked account ID for consolidated billing
-    """
     LOG.debug('Filtering by [%s] and [%s] in [%s] for [%s] day/s',
               payer_account_id, linked_account_id, bucket, duration_in_days)
 
@@ -77,7 +70,7 @@ def get_estimated_charges(bucket=None, duration_in_days=1,
             with open(csv_file) as f:
                 def linked_account_filter(row):
                     today = datetime(now.year, now.month, now.day)
-                    yesterday = today - timedelta(days=duration_in_days)
+                    yesterday = today - timedelta(days=int(duration_in_days))
 
                     if row['LinkedAccountId'] == linked_account_id and \
                             row['RecordType'] == BILLING_RECORD_TYPE_HEADER:
@@ -130,4 +123,4 @@ def extract_billing_archive(archive_file):
     return csv_file
 
 if __name__ == '__main__':
-    lambda_handler(None, None)
+    handle(None, None)
